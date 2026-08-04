@@ -86,7 +86,7 @@ class BacktestConfig:
     # Capital allocation: equal-weight across simultaneous open positions
     max_positions: int = 10
     # Train/test split for out-of-sample evaluation (date boundary)
-    oos_start: str = "2024-01-01"
+    oos_start: str = "2025-01-01"
     # Annualization factor for Sharpe (daily returns)
     trading_days: int = 252
     risk_free_rate: float = 0.0

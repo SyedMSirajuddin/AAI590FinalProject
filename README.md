@@ -111,7 +111,9 @@ The main purpose of this project is to determine whether the tone of daily finan
 
 **Roadblocks and challenges.** The primary constraint was news-history depth: an initial free-tier source provided only about one year of news, which was resolved by moving to the Alpha Vantage archive (back to March 2022). Data-quality issues included a ticker-alias mismatch (Alphabet tagged under GOOG, not GOOGL) and a pagination bug that silently truncated heavily-covered tickers, both caught by an added completeness check. A configuration-selection bug and an overly short out-of-sample window in an early evaluation had produced spurious apparent "wins" at two horizons; fixing the split and freezing the selected configuration removed these, underscoring the importance of evaluation discipline.
 
-**Repository structure.**
+**Presentation** A video presentation for this project can be found on the following URL: https://youtu.be/cpmL_qIbWHk
+
+**Repository structure.** The repository can be found using the following URL: https://github.com/SyedMSirajuddin/AAI590FinalProject
 
 ```
 src/

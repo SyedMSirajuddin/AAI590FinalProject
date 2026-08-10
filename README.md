@@ -2,102 +2,140 @@
 
 This project is a part of the AAI-590 course in the Applied Artificial Intelligence Program at the University of San Diego (USD).
 
--- Project Status: Active
+**Project Status: Completed**
+
+A point-in-time, cost-aware evaluation of FinBERT news sentiment as a multi-horizon equity trading signal. The central question is not merely whether news sentiment predicts returns, but *for how long* any such signal remains exploitable once realistic transaction costs are applied.
+
+---
 
 ## Installation
 
-To use this project, first clone the repo on your device:
+The project is organized as a Python package (`src/`) with a sequence of Jupyter notebooks that drive the analysis end to end.
+
+**1. Clone the repository**
 
 ```bash
-git clone https://github.com/<your-username>/sentiment-horizon-capstone.git
-cd sentiment-horizon-capstone
+git clone https://github.com/<your-username>/news-sentiment-trading-signal.git
+cd news-sentiment-trading-signal
+```
+
+**2. Create the environment and install dependencies**
+
+```bash
+conda create -n sentiment-capstone python=3.11
+conda activate sentiment-capstone
 pip install -r requirements.txt
 ```
 
-To run the full pipeline against live data you need a free Finnhub API key:
+Core dependencies include `pandas`, `numpy`, `scikit-learn`, `transformers`, `torch`, `tensorflow`, `datasets`, `yfinance`, `requests`, `matplotlib`, and `jupyter`.
 
-```bash
-export FINNHUB_API_KEY=your_key_here
-python scripts/run_pipeline.py
+**3. Provide an Alpha Vantage API key**
+
+News and sentiment data are pulled from Alpha Vantage. Create a `.env` file in the project root:
+
+```
+ALPHAVANTAGE_API_KEY=your_key_here
 ```
 
-To verify the machinery without any API keys or GPU (synthetic-data mode with a planted, decaying sentiment effect):
+A free key works but is rate-limited (25 requests/day); a paid tier (75 requests/minute) is recommended for the full multi-year backfill. Prices are pulled from Yahoo Finance via `yfinance` and require no key.
 
-```bash
-python scripts/demo_synthetic.py
-python scripts/run_eda.py --synthetic
-streamlit run scripts/dashboard.py
+**4. Run the notebooks in order**
+
+Use **Kernel → Restart & Run All** for each, in this sequence:
+
+```
+01_data_acquisition_and_cleaning   →  prices_clean.parquet, news_clean.parquet
+03_sentiment_model_finetuning      →  news_scored.parquet   (FinBERT scores)
+02_exploratory_data_analysis       →  EDA figures
+04_signals_and_backtesting         →  baseline multi-horizon backtest
+05_optimization_and_analysis       →  tuned backtest + LSTM
+06_alphavantage_benchmark          →  FinBERT vs. Alpha Vantage benchmark
+07_source_robustness               →  robustness: signal driven by each source
 ```
 
-Fine-tuning the sentiment model on Financial PhraseBank (GPU recommended):
+Notebook 03 runs before 02 and 04 because it produces the scored news file that the exploratory and backtesting notebooks consume. All downstream stages read `data/processed/news_scored.parquet`, so the news source can be changed without touching the analysis code.
 
-```bash
-python -m src.sentiment.finetune --base bert-base-uncased
-```
+---
 
-## Project Intro/Objective
+## Project Intro / Objective
 
-The main purpose of this project is to determine whether daily financial-news sentiment, combined with historical price behavior, can be converted into trading signals that reliably identify profitable opportunities — and, critically, to measure **how the predictive value of those signals decays as the holding horizon lengthens** from days to weeks to months. Rather than committing to a single trading style, the holding horizon is treated as the primary experimental variable: the same signal stream is backtested at horizons from 1 to 126 trading days against buy-and-hold and random-signal (no-skill) baselines. The end user is a retail investor seeking a research and decision-support screener, not a black-box autopilot. A finding that the signal disappears beyond a certain horizon is as valuable as a finding that it persists.
+The main purpose of this project is to determine whether the tone of daily financial news can be converted into a tradeable equity signal, and to characterize how that signal's value changes across holding horizons ranging from one day to roughly six months. Markets generate far more news than any individual investor can read and act on, so a reliable news-sentiment signal would be a valuable decision-support screener. The project treats the holding horizon as the primary experimental variable and evaluates an identical stream of sentiment-derived trades at eight horizons against passive and random-signal baselines, with realistic transaction costs and strict point-in-time discipline. Consistent with sound scientific practice, a rigorously supported negative result is treated as being as valuable as a positive one.
 
-## Partner(s)/Contributor(s)
+---
 
-- Syed Sirajuddin
+## Contributor
+
+- **Syed Sirajuddin** - MS Applied Artificial Intelligence, Shiley-Marcos School of Engineering, University of San Diego. (Individual project.)
+
+---
 
 ## Methods Used
 
-- NLP (transformer-based financial sentiment analysis)
-- Deep Learning (FinBERT fine-tuning; optional LSTM signal combiner)
+- Natural Language Processing (transformer-based financial sentiment classification)
 - Machine Learning
-- Time-Series Backtesting & Event Studies
-- Inferential Statistics (Monte-Carlo null distributions)
+- Deep Learning (fine-tuned FinBERT; LSTM sequence model)
+- Inferential Statistics (random-signal null hypothesis testing, rank correlation)
+- Financial Backtesting and Risk-Adjusted Evaluation
 - Data Visualization
 - Data Manipulation
+
+---
 
 ## Technologies
 
 - Python
-- PyTorch / Hugging Face Transformers & Datasets
-- TensorFlow/Keras (optional LSTM model)
-- pandas, NumPy, scikit-learn, Matplotlib, PyArrow
-- yfinance, Finnhub API, GDELT DOC API
-- Streamlit
+- PyTorch and Hugging Face Transformers (FinBERT fine-tuning and scoring)
+- TensorFlow / Keras (LSTM sequence model)
+- pandas, NumPy, scikit-learn (data manipulation, splits, metrics)
+- yfinance (Yahoo Finance price data)
+- Alpha Vantage API (news and commercial sentiment)
+- Matplotlib (visualization)
+- Jupyter Notebook
+
+---
 
 ## Project Description
 
-Two point-in-time-aligned data streams are used: (1) daily OHLCV bars for a 20-name universe of liquid U.S. large-caps (2020–2025, via yfinance), and (2) historical financial news headlines per ticker (Finnhub `/company-news`, with GDELT as a long-history fallback), plus the Financial PhraseBank corpus (~4,800 labeled sentences) for fine-tuning and validating the sentiment model.
+**Overview.** The project builds a complete, sequential pipeline: multi-year news is ingested from Alpha Vantage, each headline is scored by a fine-tuned FinBERT transformer model, scores are aggregated into point-in-time daily trading signals, and a cost-aware backtesting engine evaluates those signals across eight holding horizons against a buy-and-hold baseline and a random-signal null distribution. An independent commercial sentiment score (also from Alpha Vantage) is carried alongside FinBERT's score to benchmark the sentiment measurement and to test the robustness of the final result.
 
-The pipeline: news ingestion and cleaning → FinBERT sentiment scoring (scalar score = P(pos) − P(neg)) → daily per-ticker aggregation with confidence weighting and rolling windows → rule-based signal generation with a trend filter → a fixed-horizon backtest engine that evaluates the *same* signals at 1, 3, 5, 10, 21, 42, 63, and 126 trading-day holds with a one-bar execution delay and transaction costs → comparison against buy-and-hold and a Monte-Carlo random-signal null → decay-curve, event-study, and equity-curve visualizations. Look-ahead bias is controlled by mapping every article to the first trading session on which it could have been acted upon, applying a strictly chronological out-of-sample split, and normalizing model features with training-period statistics only.
+**Datasets.**
+- **Prices:** daily open-high-low-close-volume bars for 20 large-capitalization U.S. equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM, WMT, PG, V, UNH, HD, DIS, NFLX, AMD, BA, PFE), from Yahoo Finance via `yfinance`. 30,140 rows across 1,507 trading sessions (January 2020 – December 2025).
+- **News + sentiment:** 100,678 raw articles from the Alpha Vantage market-news-and-sentiment API, reduced to 95,758 after de-duplication and length filtering, spanning March 2022 – December 2025. Each article carries Alpha Vantage's own per-ticker relevance and sentiment scores.
+- **Labeled corpus (for the model):** the Financial PhraseBank (Malo et al., 2014), 3,453 expert-annotated financial sentences at the 75% agreement level, split 2,762 / 345 / 346 (train / val / test), used to fine-tune and validate FinBERT.
 
-Central hypothesis: aggregated daily news sentiment carries predictive value that is strongest over short (swing) horizons and decays as the holding period lengthens. Key challenges include news-to-ticker linkage noise, survivorship/look-ahead bias, transaction-cost drag at short horizons, and limited free-tier news history for long-horizon tests.
+**Hypothesis.** Daily news sentiment yields a tradeable signal that is strongest at short (swing) horizons and decays as the holding period lengthens.
 
-### Repository structure
+**Key analyses.** Exploratory analysis of return distributions, cross-ticker correlation (mean 0.361), and the sentiment–return relationship (Spearman ≈ 0.04); FinBERT fine-tuning (test accuracy 0.928, macro-F1 0.901); a FinBERT-vs-Alpha-Vantage sentiment benchmark (75.0% directional agreement); an eight-horizon backtest against a random-signal null; hyperparameter optimization; an LSTM comparison model; and a robustness check that re-runs the strategy on each sentiment source independently.
 
-| Path | Capstone element | Contents |
-| --- | --- | --- |
-| `src/data/prices.py` | Data Cleaning | OHLCV download + documented cleaning steps |
-| `src/data/news.py` | Data Cleaning | Finnhub/GDELT fetchers, dedup, point-in-time alignment |
-| `src/data/phrasebank.py` | Data Cleaning | Financial PhraseBank loader + stratified splits |
-| `scripts/run_eda.py` | Exploratory Data Analysis | Coverage, distributions, correlations, sentiment-vs-return |
-| `src/sentiment/`, `src/features/`, `src/signals/` | Model/Pipeline Design & Building | FinBERT scorer, aggregation, signal rules |
-| `src/sentiment/finetune.py`, `src/models/sequence.py` | Model Training | PhraseBank fine-tuning; optional LSTM combiner |
-| `src/config.py`, threshold/window params | Model Optimization | Centralized hyperparameters; tune in-sample, report OOS |
-| `src/backtest/`, `src/analysis/` | Model/Pipeline Analysis & Discussion | Horizon engine, baselines, metrics, decay analysis |
-| `scripts/run_pipeline.py` | — | End-to-end orchestration |
-| `scripts/demo_synthetic.py` | — | Pipeline validation on a planted, decaying effect |
-| `scripts/dashboard.py` | — | Streamlit screener (end-user deliverable) |
+**Result.** Out-of-sample (all of 2025, tuned on 2022–2024), the strategy beats the random-signal null at zero of eight horizons. Risk-adjusted performance is worst at the short swing horizons (Sharpe −1.30 at one day) and rises toward zero as the horizon lengthens, but never clears the null band. Hyperparameter tuning yields only statistically indistinguishable, near-zero configurations, and the LSTM performs at chance. The signal is "squeezed from both ends": too cost-heavy to exploit at short horizons, too data-sparse to confirm at long ones. The robustness check confirms the same failure using Alpha Vantage's independent sentiment score, showing the negative result does not depend on the particular sentiment model. This is a rigorously supported negative result, consistent with an efficient-market interpretation.
 
-### Pipeline validation
+**Roadblocks and challenges.** The primary constraint was news-history depth: an initial free-tier source provided only about one year of news, which was resolved by moving to the Alpha Vantage archive (back to March 2022). Data-quality issues included a ticker-alias mismatch (Alphabet tagged under GOOG, not GOOGL) and a pagination bug that silently truncated heavily-covered tickers, both caught by an added completeness check. A configuration-selection bug and an overly short out-of-sample window in an early evaluation had produced spurious apparent "wins" at two horizons; fixing the split and freezing the selected configuration removed these, underscoring the importance of evaluation discipline.
 
-`demo_synthetic.py` constructs a synthetic market in which news sentiment has genuine predictive power that decays geometrically over ~5 trading days. The full pipeline recovers this planted effect — out-of-sample Sharpe peaks at the 3–5 day horizons and falls inside the random-signal null band beyond ~10 days — which validates the backtest engine, cost model, and decay analysis before any live data is used.
+**Repository structure.**
 
-### Notebooks
+```
+src/
+  config.py                     # universe, horizons, backtest settings
+  data/                         # prices.py, news.py, news_alphavantage.py, phrasebank.py
+  sentiment/                    # finbert.py, finetune.py
+  features/                     # aggregate.py, technicals.py
+  signals/generate.py           # rule-based signal generation
+  backtest/                     # engine.py, baselines.py, metrics.py
+  analysis/horizon_decay.py     # horizon table, decay curves, event study
+  models/sequence.py            # LSTM comparison model
+notebooks/                      # 01 – 07 (run in the order given above)
+reports/figures/                # generated figures
+data/                           # raw/ and processed/ parquet artifacts (git-ignored)
+```
 
-The five notebooks under `notebooks/` narrate the full project for a semi-technical reader and map one-to-one onto the required code-base elements and report sections (the mapping table is in Notebook 01). Run order: 01 2192 03 2192 02 2192 04 2192 05.
+---
 
 ## License
 
-MIT — see `LICENSE`.
+This project is released under the MIT License. See the `LICENSE` file in the project root.
+
+---
 
 ## Acknowledgments
 
-Thanks to the AAI-590 instructors at the University of San Diego for guidance, and to the authors of FinBERT (Araci, 2019; ProsusAI) and the Financial PhraseBank (Malo et al., 2014).
+The author thanks the AAI-590 teaching team at the University of San Diego for their guidance throughout this capstone. Anthropic's Claude was used to assist with code scaffolding and with drafting and revising written sections from the author's own executed pipeline outputs; the author designed the methodology, ran all analyses, and verified all reported results.
